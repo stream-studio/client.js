@@ -4,7 +4,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 module.exports = {
   mode: "development",
   devtool: 'cheap-module-source-map',
-  entry: './src/demo/index.ts',
+  entry: './src/demo/index.tsx',
   output: {
     filename: 'index.js'
   },
@@ -15,17 +15,23 @@ module.exports = {
     open: true,
     hot: true,
     host: "localhost",
-    port: 9000
+    port: 9000,
+    historyApiFallback: true    
   },
   module: {
     rules: [
       {
-        test: /\.(m|j|t)s$/,
+        test: /\.(m|j)s$/,
         exclude: /(node_modules|bower_components)/,
         use: {
           loader: 'babel-loader'
         }
       },
+      {
+        test: /\.(ts|tsx)$/,
+        exclude: /node_modules/,
+        use: ["ts-loader"],
+     },      
       {
         test: /\.(sa|sc|c)ss$/,
         use: [
@@ -36,16 +42,20 @@ module.exports = {
       {
         test: /\.(png|jpe?g|gif|svg|eot|ttf|woff|woff2)$/,
         use: ['url-loader'],
-      }
+      },
+      {
+        test: /\.html$/i,
+        loader: "html-loader",
+      }      
     ]
   },
   plugins: [
     new MiniCssExtractPlugin({
       filename: 'css/index.css'
     }),
-    new HtmlWebpackPlugin(),
+    new HtmlWebpackPlugin({template: "./src/demo/index.html"}),
   ],
   resolve: {
-    extensions: ['.ts', '.js', '.json']
+    extensions: ['.tsx', '.ts', '.js', '.json']
   }
 };

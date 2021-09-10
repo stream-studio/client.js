@@ -1,0 +1,110 @@
+export CHROOT=/data/system
+export SYSTEM_IMG=/dev/sda2
+export DEFAULT_PWD=Mzr5q2CK2
+export BOOT_IMG=/dev/sda1
+
+mkfs.fat -F32 $BOOT_IMG
+/usr/sbin/mkfs.ext4 -F $SYSTEM_IMG
+sync
+mount $SYSTEM_IMG $CHROOT
+
+/usr/sbin/debootstrap \
+ --include=firmware-realtek,firmware-linux,linux-image-amd64,libva2,va-driver-all \
+ --arch=amd64 --components=main,contrib,non-free \
+ buster $CHROOT https://deb.debian.org/debian
+
+BOOT_UUID=$(/usr/sbin/blkid -s UUID -o value $BOOT_IMG)
+SYSTEM_UUID=$(/usr/sbin/blkid -s UUID -o value $SYSTEM_IMG)
+
+echo "proc $CHROOT/proc proc defaults 0 0" >> /etc/fstab
+mount proc $CHROOT/proc -t proc
+echo "sysfs $CHROOT/sys sysfs defaults 0 0" >> /etc/fstab
+mount sysfs $CHROOT/sys -t sysfs
+echo "UUID=$SYSTEM_UUID / ext4 errors=remount-ro 0 1" >> $CHROOT/etc/fstab
+echo "UUID=$BOOT_UUID / vfat errors=remount-ro 0 1" >> $CHROOT/etc/fstab
+
+cp /etc/hosts $CHROOT/etc/hosts
+cp /proc/mounts $CHROOT/etc/mtab
+
+chroot $CHROOT /bin/bash -c "DEBIAN_FRONTEND=noninteractive apt-get -y install \
+    sudo \
+    xorg \
+    chromium \
+    openbox \
+    lightdm \
+    openvpn \
+    grub \
+    supervisor \
+    console-data \
+    keyboard-configuration \
+    locales \
+    tzdata \
+    pulseaudio \
+    openssh-server
+    "
+
+chroot $CHROOT /bin/bash -c "echo -e '$DEFAULT_PWD\n$DEFAULT_PWD' | passwd"
+
+chroot $CHROOT /bin/bash -c "useradd -m kiosk-user"
+
+chroot $CHROOT /bin/bash -c "locale-gen --purge fr_FR.UTF-8"
+ echo -e 'LANG="fr_FR.UTF-8"\nLANGUAGE="fr_FR:en"\n' > $CHROOT//etc/default/locale
+
+echo "[SeatDefaults]
+autologin-user=kiosk-user
+user-session=openbox" >> $CHROOT/etc/lightdm/lightdm.conf
+
+mkdir -p $CHROOT/home/kiosk-user/.config/openbox
+
+echo "chromium \
+    --no-first-run \
+    --disable \
+    --disable-translate \
+    --disable-infobars \
+    --disable-suggestions-service \
+    --disable-save-password-bubble \
+    --start-maximized \
+    --kiosk 'http://www.google.com' &" >> $CHROOT/home/kiosk-user/.config/openbox/autostart
+
+chmod +x $CHROOT/home/kiosk-user/.config/openbox/autostart
+chroot $CHROOT /bin/bash -c "chown kiosk-user:kiosk-user /home/kiosk-user/.config"
+
+mkdir $CHROOT/boot/efi
+mount $BOOT_IMG $CHROOT/boot/efi
+
+echo "
+auto lo
+iface lo inet loopback
+
+auto enp2s0
+iface enp2s0 inet dhcp" > $CHROOT/etc/network/interfaces
+
+echo "nameserver 8.8.8.8" > $CHROOT/etc/resolv.conf
+echo "sportbak" > $CHROOT/etc/hostname
+
+echo "127.0.0.1 localhost
+127.0.1.1 sportbak
+
+# The following lines are desirable for IPv6 capable hosts
+::1     ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+ff02::3 ip6-allhosts" > $CHROOT/etc/hosts 
+
+
+/usr/sbin/grub-install --target=x86_64-efi --root-directory=$CHROOT --efi-directory=$CHROOT/boot/efi
+
+
+echo "set quiet=1
+
+set root=(hd0,gpt2)
+linux  /vmlinuz root=UUID=$SYSTEM_UUID ro  quiet splash
+initrd /initrd.img
+boot" > $CHROOT/boot/efi/EFI/debian/grub.cfg
+
+umount $CHROOT/boot/efi
+umount $CHROOT/proc
+umount $CHROOT/sys
+umount $SYSTEM_IMG
