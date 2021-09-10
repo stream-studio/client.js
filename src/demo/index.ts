@@ -1,8 +1,8 @@
-import MyLibrary from "../lib";
-const myLibraryInstance = new MyLibrary();
+import StreamStudioClient from "../lib";
+const client = new StreamStudioClient("", "");
 
 document.querySelector("body").innerHTML = `<h1>Hello World!</h1>`;
 
-console.log("myLibraryInstance", myLibraryInstance);
+console.log("StreamStudio", client);
 
-myLibraryInstance.myMethod(); 
+client.connect(); 
