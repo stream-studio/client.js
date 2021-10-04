@@ -7,6 +7,28 @@ interface Quality {
   bitrate: number;
 }
 
+export class StreamStudioClientApi{
+  
+  constructor(private endpoint: string, private apiKey: string){
+
+  }
+
+  async createRoom(externalId?: string){
+    return await fetch(this.endpoint+"/api/rooms",
+    {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-api-key': this.apiKey
+        },
+        method: "POST",
+        body: JSON.stringify({external_id: externalId})
+    });
+  }
+
+}
+
+
 export default class StreamStudioClient {
   private isVideoMuted: boolean;
   private isAudioMuted: boolean;
@@ -96,86 +118,89 @@ export default class StreamStudioClient {
         msg.action !== "room/created" &&
         msg.action !== "room/error"
       ) {
-        if ("sdp" in msg) {
-          this.peerConnection.setRemoteDescription(msg.sdp).then(() => {
-            this.peerConnection
-              .createAnswer()
-              .then((anwser) => {
-                this.peerConnection.setLocalDescription(anwser).then(() => {
-                  this.webSocket.send(
-                    JSON.stringify({
-                      action: "signaling",
-                      params: { sdp: anwser },
-                    })
-                  );
-                });
-              })
-              .catch((error) => {
-                this.fireEvent({
-                  action: "room/error",
-                  params: { code: 2000, reason: "Negociation error " + error },
-                });
+        if (msg.action == "room/join") {
+          if (this.element != null) {
+            if (Hls.isSupported()) {
+              this.hls = new Hls({
+                enableWorker: true,
+                liveBackBufferLength: 900,
               });
-          });
-        }
-      } else if ("ice" in msg) {
-        this.peerConnection.addIceCandidate(msg.ice);
-      } else if (msg.action == "room/join") {
-      } else if (msg.action == "room/join") {
-        if (this.element != null) {
-          if (Hls.isSupported()) {
-            this.hls = new Hls({
-              enableWorker: true,
-              liveBackBufferLength: 900,
-            });
-            this.hls.loadSource(msg.params["hls"]);
-            this.hls.attachMedia(this.element);
-            this.hls.on(Hls.Events.MEDIA_ATTACHING, () => {
-              this.element.play();
-            });
-            this.fireEvent({ action: "room/joined", params: msg.params });
-          } else if (
-            this.element.canPlayType("application/vnd.apple.mpegurl")
+              this.hls.loadSource(msg.params["hls"]);
+              this.hls.attachMedia(this.element);
+              this.hls.on(Hls.Events.MEDIA_ATTACHING, () => {
+                this.element.play();
+              });
+              this.fireEvent({ action: "room/joined", params: msg.params });
+            } else if (
+              this.element.canPlayType("application/vnd.apple.mpegurl")
+            ) {
+              this.element.src = msg.params["hls"];
+              this.element.addEventListener("canplay", () => {
+                this.element.play();
+              });
+              this.fireEvent({ action: "room/joined", params: msg.params });
+            } else {
+              this.fireEvent({
+                action: "room/error",
+                params: { code: 1000, reason: "Can't start hls player" },
+              });
+            }
+          }
+        } else if (msg.action === "room/slow-link") {
+          this.fireEvent({ action: "room/slow-link", params: {} });
+  
+          if (
+            Math.floor(
+              (new Date().getTime() - this.lastQualityChange.getTime()) / 1000
+            ) >= 10
           ) {
-            this.element.src = msg.params["hls"];
-            this.element.addEventListener("canplay", () => {
-              this.element.play();
-            });
-            this.fireEvent({ action: "room/joined", params: msg.params });
-          } else {
+            const nextQuality = this.currentQuality + 1;
+            if (nextQuality < this.qualities.length)
+              var sender = this.peerConnection.getSenders().find(function (s) {
+                return s.track.kind == "video";
+              });
+            this.currentQuality = nextQuality;
+            this.setVideoParams(
+              sender,
+              this.qualities[this.currentQuality].quality,
+              this.qualities[this.currentQuality].bitrate
+            );
+            this.lastQualityChange = new Date();
             this.fireEvent({
-              action: "room/error",
-              params: { code: 1000, reason: "Can't start hls player" },
+              action: "room/switch-quality",
+              params: this.qualities[this.currentQuality],
             });
+            this.webSocket.send(JSON.stringify({ action: "room/ask-keyframe" }));
           }
         }
-      } else if (msg.action === "room/slow-link") {
-        this.fireEvent({ action: "room/slow-link", params: {} });
-
-        if (
-          Math.floor(
-            (new Date().getTime() - this.lastQualityChange.getTime()) / 1000
-          ) >= 10
-        ) {
-          const nextQuality = this.currentQuality + 1;
-          if (nextQuality < this.qualities.length)
-            var sender = this.peerConnection.getSenders().find(function (s) {
-              return s.track.kind == "video";
+      } 
+      else if ("sdp" in msg) {
+        console.log("Setting remote candidate");
+        this.peerConnection.setRemoteDescription(msg.sdp).then(() => {
+          this.peerConnection
+            .createAnswer()
+            .then((anwser) => {
+              this.peerConnection.setLocalDescription(anwser).then(() => {
+                this.webSocket.send(
+                  JSON.stringify({
+                    action: "signaling",
+                    params: { sdp: anwser },
+                  })
+                );
+              });
+            })
+            .catch((error) => {
+              this.fireEvent({
+                action: "room/error",
+                params: { code: 2000, reason: "Negociation error " + error },
+              });
             });
-          this.currentQuality = nextQuality;
-          this.setVideoParams(
-            sender,
-            this.qualities[this.currentQuality].quality,
-            this.qualities[this.currentQuality].bitrate
-          );
-          this.lastQualityChange = new Date();
-          this.fireEvent({
-            action: "room/switch-quality",
-            params: this.qualities[this.currentQuality],
-          });
-          this.webSocket.send(JSON.stringify({ action: "room/ask-keyframe" }));
-        }
-      } else {
+        });
+      }
+      else if ("ice" in msg) {
+        this.peerConnection.addIceCandidate(new RTCIceCandidate(msg.ice));
+      } 
+     else {
         this.fireEvent(msg);
       }
     };
@@ -198,11 +223,11 @@ export default class StreamStudioClient {
     }
   }
 
-  getVideoInputDevices() {
+  getVideoInputDevices() : Promise<MediaDeviceInfo[]> {
     return this.getDevices("videoinput");
   }
 
-  getAudioInputDevices() {
+  getAudioInputDevices() : Promise<MediaDeviceInfo[]> {
     return this.getDevices("audioinput");
   }
 
@@ -267,7 +292,8 @@ export default class StreamStudioClient {
     });
   }
 
-  startPreview(stream: MediaStream) {
+  startPreview(stream?: MediaStream) {
+    console.log(this.element)
     if (this.element != null) {
       if (stream === undefined || stream === null) {
         this.getDeviceStream()
@@ -535,7 +561,7 @@ export default class StreamStudioClient {
     }
   }
 
-  switchVideoDevice(device: any) {
+  switchVideoDevice(device: MediaDeviceInfo) {
     this.videoInputDevice = device;
     this.getDeviceStream().then((stream) => {
       if (this.peerConnection !== null) {
@@ -608,7 +634,7 @@ export default class StreamStudioClient {
     });
   }
 
-  getDevices(type: any) {
+  getDevices(type: string) : Promise<MediaDeviceInfo[]>  {
     return new Promise(function (resolve, reject) {
       console.log(navigator.mediaDevices.getSupportedConstraints());
       navigator.mediaDevices
