@@ -3,7 +3,7 @@ import * as ReactDOM from 'react-dom';
 
 import Viewer from './pages/Viewer';
 import Publisher from './pages/Publisher';
-
+import MediaServerDemo from './pages/MediaServerDemo';
 import {
     BrowserRouter as Router,
     Switch,
@@ -23,6 +23,7 @@ import {
                 <Switch>
                     <Route exact path='/' component={Publisher} />
                     <Route exact path='/viewer' component={Viewer} />
+                    <Route exact path='/demo' component={MediaServerDemo} />
                 </Switch>
             </main>
         </Router>

@@ -1,5 +1,11 @@
 import "core-js/stable";
 import "regenerator-runtime/runtime";
+export declare class StreamStudioClientApi {
+    private endpoint;
+    private apiKey;
+    constructor(endpoint: string, apiKey: string);
+    createRoom(externalId?: string): Promise<Response>;
+}
 export default class StreamStudioClient {
     private url;
     private externalId;
@@ -22,15 +28,15 @@ export default class StreamStudioClient {
     fireEvent(data: {}): void;
     addEventListener(callback: Function): void;
     removeEventListener(callback: Function): void;
-    getVideoInputDevices(): Promise<unknown>;
-    getAudioInputDevices(): Promise<unknown>;
+    getVideoInputDevices(): Promise<MediaDeviceInfo[]>;
+    getAudioInputDevices(): Promise<MediaDeviceInfo[]>;
     getStats(): void;
     join(roomId: string, externalId: string): void;
     stop(): void;
     unJoin(): void;
     setPreviewElement(element: HTMLVideoElement): void;
     getDeviceStream(): Promise<MediaStream>;
-    startPreview(stream: MediaStream): void;
+    startPreview(stream?: MediaStream): void;
     testSwitchQuality(): void;
     startPublishing(roomId: string): void;
     setVideoParams(sender: RTCRtpSender, height: number, bitrate: number): Promise<void>;
@@ -41,8 +47,8 @@ export default class StreamStudioClient {
     stopPublishing(): void;
     closePeerConnection(): void;
     stopPreview(): void;
-    switchVideoDevice(device: any): void;
+    switchVideoDevice(device: MediaDeviceInfo): void;
     switchAudioDevice(device: any): void;
     askPermissions(): Promise<void>;
-    getDevices(type: any): Promise<unknown>;
+    getDevices(type: string): Promise<MediaDeviceInfo[]>;
 }

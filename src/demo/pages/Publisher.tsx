@@ -3,6 +3,8 @@ import  { useState, useRef, useCallback } from 'react';
 import StreamStudioClient  from '../../lib';
 import { StreamStudioClientApi }  from '../../lib';
 
+import MediaClient  from '../../lib/media';
+
 const Publisher = () => {
     
     const [videoDevices, setVideoDevices] = useState([])
@@ -27,7 +29,7 @@ const Publisher = () => {
 
     const previewElement = useCallback(node => {
         if (node !== null) {
-            client.current = new StreamStudioClient("ws://localhost:8000", "");
+            /*client.current = new StreamStudioClient("ws://localhost:8000", "");
             apiClient.current = new StreamStudioClientApi("http://localhost:8000", "fcf6d090-9ad2-4c0f-8101-c0595a2feab4")
             client.current.connect();
 
@@ -44,7 +46,7 @@ const Publisher = () => {
                         client.current.startPreview();
                     }); 
 
-            });
+            });*/
         }
     }, []);
 
@@ -82,7 +84,7 @@ const Publisher = () => {
                     
                     { !isStreaming &&  <button onClick={ async () => { let resp = await apiClient.current.createRoom("aaaa"); client.current.startPublishing((await resp.json())["_id"]); setIsStreaming(true); }}>Start streaming</button> }
                     { isStreaming && <button onClick={ () => { client.current.stopPublishing(); setIsStreaming(false); }}>Stop streaming</button> }
-                    <button id="btnStats" onClick={ () => client.current.getStats() }>Get stats</button>
+                    <button id="btnStats" onClick={ () => {client.current.getStats()} }>Get stats</button>
                     
 
                 </div>

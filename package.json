@@ -107,7 +107,10 @@
   },
   "dependencies": {
     "core-js": "^3.17.3",
+    "events": "^3.3.0",
     "hls.js": "^1.0.10",
-    "regenerator-runtime": "^0.13.9"
+    "regenerator-runtime": "^0.13.9",
+    "util": "^0.12.4",
+    "uuidv4": "^6.2.12"
   }
 }

@@ -37,6 +37,32 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 import "core-js/stable";
 import "regenerator-runtime/runtime";
 import Hls from "hls.js";
+var StreamStudioClientApi = /** @class */ (function () {
+    function StreamStudioClientApi(endpoint, apiKey) {
+        this.endpoint = endpoint;
+        this.apiKey = apiKey;
+    }
+    StreamStudioClientApi.prototype.createRoom = function (externalId) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, fetch(this.endpoint + "/api/rooms", {
+                            headers: {
+                                Accept: "application/json",
+                                "Content-Type": "application/json",
+                                "X-api-key": this.apiKey,
+                            },
+                            method: "POST",
+                            body: JSON.stringify({ external_id: externalId }),
+                        })];
+                    case 1: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
+    };
+    return StreamStudioClientApi;
+}());
+export { StreamStudioClientApi };
 var StreamStudioClient = /** @class */ (function () {
     function StreamStudioClient(url, externalId) {
         this.url = url;
@@ -98,78 +124,77 @@ var StreamStudioClient = /** @class */ (function () {
                 msg.action !== "room/deleted" &&
                 msg.action !== "room/created" &&
                 msg.action !== "room/error") {
-                if ("sdp" in msg) {
-                    _this.peerConnection.setRemoteDescription(msg.sdp).then(function () {
-                        _this.peerConnection
-                            .createAnswer()
-                            .then(function (anwser) {
-                            _this.peerConnection.setLocalDescription(anwser).then(function () {
-                                _this.webSocket.send(JSON.stringify({
-                                    action: "signaling",
-                                    params: { sdp: anwser },
-                                }));
+                if (msg.action == "room/join") {
+                    if (_this.element != null) {
+                        if (Hls.isSupported()) {
+                            _this.hls = new Hls({
+                                enableWorker: true,
+                                liveBackBufferLength: 900,
                             });
-                        })
-                            .catch(function (error) {
+                            _this.hls.loadSource(msg.params["hls"]);
+                            _this.hls.attachMedia(_this.element);
+                            _this.hls.on(Hls.Events.MEDIA_ATTACHING, function () {
+                                _this.element.play();
+                            });
+                            _this.fireEvent({ action: "room/joined", params: msg.params });
+                        }
+                        else if (_this.element.canPlayType("application/vnd.apple.mpegurl")) {
+                            _this.element.src = msg.params["hls"];
+                            _this.element.addEventListener("canplay", function () {
+                                _this.element.play();
+                            });
+                            _this.fireEvent({ action: "room/joined", params: msg.params });
+                        }
+                        else {
                             _this.fireEvent({
                                 action: "room/error",
-                                params: { code: 2000, reason: "Negociation error " + error },
+                                params: { code: 1000, reason: "Can't start hls player" },
                             });
+                        }
+                    }
+                }
+                else if (msg.action === "room/slow-link") {
+                    _this.fireEvent({ action: "room/slow-link", params: {} });
+                    if (Math.floor((new Date().getTime() - _this.lastQualityChange.getTime()) / 1000) >= 10) {
+                        var nextQuality = _this.currentQuality + 1;
+                        if (nextQuality < _this.qualities.length)
+                            var sender = _this.peerConnection.getSenders().find(function (s) {
+                                return s.track.kind == "video";
+                            });
+                        _this.currentQuality = nextQuality;
+                        _this.setVideoParams(sender, _this.qualities[_this.currentQuality].quality, _this.qualities[_this.currentQuality].bitrate);
+                        _this.lastQualityChange = new Date();
+                        _this.fireEvent({
+                            action: "room/switch-quality",
+                            params: _this.qualities[_this.currentQuality],
                         });
-                    });
+                        _this.webSocket.send(JSON.stringify({ action: "room/ask-keyframe" }));
+                    }
                 }
             }
-            else if ("ice" in msg) {
-                _this.peerConnection.addIceCandidate(msg.ice);
-            }
-            else if (msg.action == "room/join") {
-            }
-            else if (msg.action == "room/join") {
-                if (_this.element != null) {
-                    if (Hls.isSupported()) {
-                        _this.hls = new Hls({
-                            enableWorker: true,
-                            liveBackBufferLength: 900,
+            else if ("sdp" in msg) {
+                console.log("Setting remote candidate");
+                _this.peerConnection.setRemoteDescription(msg.sdp).then(function () {
+                    _this.peerConnection
+                        .createAnswer()
+                        .then(function (anwser) {
+                        _this.peerConnection.setLocalDescription(anwser).then(function () {
+                            _this.webSocket.send(JSON.stringify({
+                                action: "signaling",
+                                params: { sdp: anwser },
+                            }));
                         });
-                        _this.hls.loadSource(msg.params["hls"]);
-                        _this.hls.attachMedia(_this.element);
-                        _this.hls.on(Hls.Events.MEDIA_ATTACHING, function () {
-                            _this.element.play();
-                        });
-                        _this.fireEvent({ action: "room/joined", params: msg.params });
-                    }
-                    else if (_this.element.canPlayType("application/vnd.apple.mpegurl")) {
-                        _this.element.src = msg.params["hls"];
-                        _this.element.addEventListener("canplay", function () {
-                            _this.element.play();
-                        });
-                        _this.fireEvent({ action: "room/joined", params: msg.params });
-                    }
-                    else {
+                    })
+                        .catch(function (error) {
                         _this.fireEvent({
                             action: "room/error",
-                            params: { code: 1000, reason: "Can't start hls player" },
+                            params: { code: 2000, reason: "Negociation error " + error },
                         });
-                    }
-                }
-            }
-            else if (msg.action === "room/slow-link") {
-                _this.fireEvent({ action: "room/slow-link", params: {} });
-                if (Math.floor((new Date().getTime() - _this.lastQualityChange.getTime()) / 1000) >= 10) {
-                    var nextQuality = _this.currentQuality + 1;
-                    if (nextQuality < _this.qualities.length)
-                        var sender = _this.peerConnection.getSenders().find(function (s) {
-                            return s.track.kind == "video";
-                        });
-                    _this.currentQuality = nextQuality;
-                    _this.setVideoParams(sender, _this.qualities[_this.currentQuality].quality, _this.qualities[_this.currentQuality].bitrate);
-                    _this.lastQualityChange = new Date();
-                    _this.fireEvent({
-                        action: "room/switch-quality",
-                        params: _this.qualities[_this.currentQuality],
                     });
-                    _this.webSocket.send(JSON.stringify({ action: "room/ask-keyframe" }));
-                }
+                });
+            }
+            else if ("ice" in msg) {
+                _this.peerConnection.addIceCandidate(new RTCIceCandidate(msg.ice));
             }
             else {
                 _this.fireEvent(msg);
@@ -250,6 +275,7 @@ var StreamStudioClient = /** @class */ (function () {
     };
     StreamStudioClient.prototype.startPreview = function (stream) {
         var _this = this;
+        console.log(this.element);
         if (this.element != null) {
             if (stream === undefined || stream === null) {
                 this.getDeviceStream()

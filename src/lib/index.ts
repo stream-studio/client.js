@@ -7,27 +7,21 @@ interface Quality {
   bitrate: number;
 }
 
-export class StreamStudioClientApi{
-  
-  constructor(private endpoint: string, private apiKey: string){
+export class StreamStudioClientApi {
+  constructor(private endpoint: string, private apiKey: string) {}
 
-  }
-
-  async createRoom(externalId?: string){
-    return await fetch(this.endpoint+"/api/rooms",
-    {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-api-key': this.apiKey
-        },
-        method: "POST",
-        body: JSON.stringify({external_id: externalId})
+  async createRoom(externalId?: string) {
+    return await fetch(this.endpoint + "/api/rooms", {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-api-key": this.apiKey,
+      },
+      method: "POST",
+      body: JSON.stringify({ external_id: externalId }),
     });
   }
-
 }
-
 
 export default class StreamStudioClient {
   private isVideoMuted: boolean;
@@ -148,7 +142,7 @@ export default class StreamStudioClient {
           }
         } else if (msg.action === "room/slow-link") {
           this.fireEvent({ action: "room/slow-link", params: {} });
-  
+
           if (
             Math.floor(
               (new Date().getTime() - this.lastQualityChange.getTime()) / 1000
@@ -170,11 +164,12 @@ export default class StreamStudioClient {
               action: "room/switch-quality",
               params: this.qualities[this.currentQuality],
             });
-            this.webSocket.send(JSON.stringify({ action: "room/ask-keyframe" }));
+            this.webSocket.send(
+              JSON.stringify({ action: "room/ask-keyframe" })
+            );
           }
         }
-      } 
-      else if ("sdp" in msg) {
+      } else if ("sdp" in msg) {
         console.log("Setting remote candidate");
         this.peerConnection.setRemoteDescription(msg.sdp).then(() => {
           this.peerConnection
@@ -196,11 +191,9 @@ export default class StreamStudioClient {
               });
             });
         });
-      }
-      else if ("ice" in msg) {
+      } else if ("ice" in msg) {
         this.peerConnection.addIceCandidate(new RTCIceCandidate(msg.ice));
-      } 
-     else {
+      } else {
         this.fireEvent(msg);
       }
     };
@@ -223,11 +216,11 @@ export default class StreamStudioClient {
     }
   }
 
-  getVideoInputDevices() : Promise<MediaDeviceInfo[]> {
+  getVideoInputDevices(): Promise<MediaDeviceInfo[]> {
     return this.getDevices("videoinput");
   }
 
-  getAudioInputDevices() : Promise<MediaDeviceInfo[]> {
+  getAudioInputDevices(): Promise<MediaDeviceInfo[]> {
     return this.getDevices("audioinput");
   }
 
@@ -293,7 +286,7 @@ export default class StreamStudioClient {
   }
 
   startPreview(stream?: MediaStream) {
-    console.log(this.element)
+    console.log(this.element);
     if (this.element != null) {
       if (stream === undefined || stream === null) {
         this.getDeviceStream()
@@ -634,7 +627,7 @@ export default class StreamStudioClient {
     });
   }
 
-  getDevices(type: string) : Promise<MediaDeviceInfo[]>  {
+  getDevices(type: string): Promise<MediaDeviceInfo[]> {
     return new Promise(function (resolve, reject) {
       console.log(navigator.mediaDevices.getSupportedConstraints());
       navigator.mediaDevices
